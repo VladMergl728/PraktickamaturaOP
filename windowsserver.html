@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Správa Windows Serveru z Linuxu - Tahák</title>
+<style>
+body { font-family: Arial; background:#111; color:#eee; padding:20px; }
+h1,h2 { color:#4fc3f7; }
+code { background:#222; padding:3px 6px; display:block; margin:5px 0; }
+.step { margin-bottom:20px; padding:10px; border-left:4px solid #4fc3f7; }
+</style>
+</head>
+<body>
+
+<h1>Windows Server z Linuxu - Krok za krokem</h1>
+
+<h2>1. Síť (NAT + IP)</h2>
+<div class="step">
+Klikni: Nastavení VM → Network → NAT<br>
+Windows Server:
+<ul>
+<li>IP: 192.168.1.10</li>
+<li>Maska: 255.255.255.0</li>
+<li>Gateway: 192.168.1.1</li>
+<li>DNS: 192.168.1.10</li>
+</ul>
+</div>
+
+<h2>2. DHCP + DNS (Windows Server)</h2>
+<div class="step">
+Klikni: Server Manager → Add Roles → DHCP + DNS<br>
+DHCP Setup:
+<ul>
+<li>Scope: 192.168.1.100 - 192.168.1.200</li>
+</ul>
+
+Rezervace:
+<ul>
+<li>Klikni: DHCP → Reservations → New</li>
+<li>Zadej MAC adresu Linuxu</li>
+</ul>
+</div>
+
+<h2>3. IIS (Web server)</h2>
+<div class="step">
+Klikni: Add Roles → IIS<br>
+
+Přidání webu:
+<ul>
+<li>Server Manager → IIS Manager</li>
+<li>Sites → Add Website</li>
+<li>Port: 8080</li>
+<li>Port: 8081 (druhý web)</li>
+</ul>
+</div>
+
+<h2>4. FTP Server</h2>
+<div class="step">
+Klikni: IIS → Add FTP Site<br>
+Nastav složku (např. C:\inetpub\wwwroot)<br>
+Povolit login uživatele
+</div>
+
+<h2>5. Firewall</h2>
+<div class="step">
+Klikni: Windows Firewall → Advanced settings<br>
+Povol:
+<ul>
+<li>RDP (3389)</li>
+<li>FTP (21)</li>
+<li>HTTP (8080,8081)</li>
+<li>DNS (53)</li>
+<li>DHCP (67,68)</li>
+</ul>
+</div>
+
+<h2>6. Storage Spaces</h2>
+<div class="step">
+Klikni: Server Manager → File and Storage Services<br>
+Storage Pools → New Pool<br>
+Přidej disky → vytvoř Volume
+</div>
+
+<h2>7. Linux (KDE + nástroje)</h2>
+<div class="step">
+Aktualizace:
+<code>sudo apt update && sudo apt upgrade</code>
+
+KDE:
+<code>sudo apt install kde-plasma-desktop</code>
+
+RDP klient:
+<code>sudo apt install remmina</code>
+
+FTP klient:
+<code>sudo apt install filezilla</code>
+</div>
+
+<h2>8. RDP připojení</h2>
+<div class="step">
+Spusť Remmina → New Connection<br>
+IP: 192.168.1.10<br>
+User: vytvořený admin
+</div>
+
+<h2>9. FTP test</h2>
+<div class="step">
+Spusť FileZilla:
+<ul>
+<li>Host: 192.168.1.10</li>
+<li>Port: 21</li>
+</ul>
+
+Nahraj:
+<code>index.html</code>
+</div>
+
+<h2>10. Ověření</h2>
+<div class="step">
+Otevři v prohlížeči:
+<ul>
+<li>http://192.168.1.10:8080</li>
+<li>http://192.168.1.10:8081</li>
+</ul>
+</div>
+
+</body>
+</html>
