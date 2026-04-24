@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Template dokumentace - domácí síťová infrastruktura</title>
+<style>
+body { font-family: Arial; background:#0f172a; color:#e5e7eb; padding:20px; line-height:1.5; }
+h1 { color:#38bdf8; }
+h2 { color:#22c55e; border-bottom:1px solid #334155; padding-bottom:5px; }
+h3 { color:#facc15; }
+.step { background:#111827; padding:14px; margin:14px 0; border-left:5px solid #22c55e; }
+.doc { border-left-color:#38bdf8; }
+.warn { border-left-color:#f97316; }
+code, pre { background:#020617; color:#facc15; padding:8px; display:block; white-space:pre-wrap; margin:8px 0; }
+.placeholder { color:#94a3b8; font-style:italic; }
+</style>
+</head>
+<body>
+
+<h1>Domácí síťová infrastruktura - Fedora server + Windows 11</h1>
+
+<div class="step warn">
+<b>Úloha:</b> Windows 11 slouží jako správcovský počítač. Fedora Linux je centrální multimediální server.
+Síť běží ve VMware přes NAT v rozsahu třídy B: <b>172.16.0.0/16</b>.
+</div>
+
+<h2>1. VMware síť</h2>
+<div class="step">
+Klikni:
+<code>VM Settings → Network Adapter → NAT</code>
+
+Nastav to u:
+<ul>
+<li>Windows 11 VM</li>
+<li>Fedora Server VM</li>
+</ul>
+
+Použitá síť:
+<code>172.16.0.0/16</code>
+
+Gateway:
+<code>172.16.0.1</code>
+
+Statická IP Fedory:
+<code>172.16.255.254</code>
+</div>
+
+<h2>2. Instalace základních balíčků na Fedoře</h2>
+<div class="step">
+Aktualizace:
+<code>sudo dnf update -y</code>
+
+Instalace služeb:
+<code>sudo dnf install openssh-server cockpit samba httpd tigervnc-server lvm2 nano tar firewalld -y</code>
+
+Instalace KDE Plasma:
+<code>sudo dnf groupinstall "KDE Plasma Workspaces" -y</code>
+
+Zapnutí grafického režimu:
+<code>sudo systemctl set-default graphical.target</code>
+</div>
+
+<h2>3. Statická IP adresa</h2>
+<div class="step">
+Zjisti název síťového připojení:
+<code>nmcli con show</code>
+
+Nastavení statické IP:
+<code>sudo nmcli con mod "Wired connection 1" ipv4.addresses 172.16.255.254/16</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.gateway 172.16.0.1</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.dns 8.8.8.8</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.method manual</code>
+
+Restart připojení:
+<code>sudo nmcli con up "Wired connection 1"</code>
+
+Ověření:
+<code>ip a</code>
+<code>ping 8.8.8.8</code>
+</div>
+
+<h2>4. SSH přístup pomocí klíčů</h2>
+<div class="step">
+Na Fedoře zapni SSH:
+<code>sudo systemctl enable --now sshd</code>
+
+Na Windows 11 otevři PowerShell:
+<code>ssh-keygen</code>
+
+Zkopíruj veřejný klíč na server:
+<code>scp C:\Users\TVUJ_UZIVATEL\.ssh\id_rsa.pub user@172.16.255.254:/home/user/</code>
+
+Na Fedoře:
+<code>mkdir -p ~/.ssh</code>
+<code>cat ~/id_rsa.pub >> ~/.ssh/authorized_keys</code>
+<code>chmod 700 ~/.ssh</code>
+<code>chmod 600 ~/.ssh/authorized_keys</code>
+
+Test z Windows:
+<code>ssh user@172.16.255.254</code>
+</div>
+
+<h2>5. VNC vzdálená plocha</h2>
+<div class="step">
+Na Fedoře spusť:
+<code>vncserver</code>
+
+Nastav VNC heslo.
+
+Na Windows otevři VNC Viewer a připoj se na:
+<code>172.16.255.254:5901</code>
+</div>
+
+<h2>6. Firewall - firewalld</h2>
+<div class="step">
+Zapnutí firewallu:
+<code>sudo systemctl enable --now firewalld</code>
+
+Povol pouze nutné služby:
+<code>sudo firewall-cmd --permanent --add-service=ssh</code>
+<code>sudo firewall-cmd --permanent --add-port=5901/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=8080/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=8081/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=9090/tcp</code>
+<code>sudo firewall-cmd --permanent --add-service=samba</code>
+
+Načtení pravidel:
+<code>sudo firewall-cmd --reload</code>
+
+Ověření:
+<code>sudo firewall-cmd --list-all</code>
+</div>
+
+<h2>7. Cockpit</h2>
+<div class="step">
+Zapnutí Cockpitu:
+<code>sudo systemctl enable --now cockpit.socket</code>
+
+Na Windows otevři v prohlížeči:
+<code>https://172.16.255.254:9090</code>
+
+Přihlas se účtem z Fedory.
+</div>
+
+<h2>8. Samba sdílení SHARE</h2>
+<div class="step">
+Vytvoř složku:
+<code>mkdir -p /home/user/SHARE</code>
+<code>chmod 777 /home/user/SHARE</code>
+
+Otevři konfiguraci:
+<code>sudo nano /etc/samba/smb.conf</code>
+
+Na konec vlož:
+<pre>[SHARE]
+path = /home/user/SHARE
+browsable = yes
+writable = yes
+guest ok = yes
+read only = no</pre>
+
+Zapni Sambu:
+<code>sudo systemctl enable --now smb nmb</code>
+
+Restart:
+<code>sudo systemctl restart smb nmb</code>
+
+Ve Windows otevři Průzkumník souborů:
+<code>\\172.16.255.254\SHARE</code>
+</div>
+
+<h2>9. Apache weby na portech 8080 a 8081</h2>
+<div class="step">
+Vytvoř webové složky:
+<code>sudo mkdir -p /var/www/web8080</code>
+<code>sudo mkdir -p /var/www/web8081</code>
+
+Testovací stránky:
+<code>echo "WEB 8080 funguje" | sudo tee /var/www/web8080/index.html</code>
+<code>echo "WEB 8081 funguje" | sudo tee /var/www/web8081/index.html</code>
+
+Otevři konfiguraci Apache:
+<code>sudo nano /etc/httpd/conf/httpd.conf</code>
+
+Na konec vlož:
+<pre>Listen 8080
+Listen 8081
+
+&lt;VirtualHost *:8080&gt;
+DocumentRoot "/var/www/web8080"
+&lt;/VirtualHost&gt;
+
+&lt;VirtualHost *:8081&gt;
+DocumentRoot "/var/www/web8081"
+&lt;/VirtualHost&gt;</pre>
+
+Zapni Apache:
+<code>sudo systemctl enable --now httpd</code>
+
+Restart:
+<code>sudo systemctl restart httpd</code>
+
+Ověření z Windows:
+<code>http://172.16.255.254:8080</code>
+<code>http://172.16.255.254:8081</code>
+</div>
+
+<h2>10. SCP / SFTP nahrání index.html</h2>
+<div class="step">
+Na Windows vytvoř soubor:
+<code>index.html</code>
+
+Nahraj soubor přes SCP:
+<code>scp index.html user@172.16.255.254:/home/user/</code>
+
+Na Fedoře překopíruj do obou webů:
+<code>sudo cp /home/user/index.html /var/www/web8080/index.html</code>
+<code>sudo cp /home/user/index.html /var/www/web8081/index.html</code>
+
+Ověř v prohlížeči:
+<code>http://172.16.255.254:8080</code>
+<code>http://172.16.255.254:8081</code>
+</div>
+
+<h2>11. LVM ze dvou datových disků</h2>
+<div class="step">
+Zobraz disky:
+<code>lsblk</code>
+
+Předpoklad:
+<code>/dev/sdb</code>
+<code>/dev/sdc</code>
+
+Vytvoř fyzické svazky:
+<code>sudo pvcreate /dev/sdb /dev/sdc</code>
+
+Vytvoř skupinu disků:
+<code>sudo vgcreate data_vg /dev/sdb /dev/sdc</code>
+
+Vytvoř logický svazek:
+<code>sudo lvcreate -l 100%FREE -n data_lv data_vg</code>
+
+Naformátuj:
+<code>sudo mkfs.ext4 /dev/data_vg/data_lv</code>
+
+Připoj:
+<code>sudo mkdir /mnt/data</code>
+<code>sudo mount /dev/data_vg/data_lv /mnt/data</code>
+
+Ověření:
+<code>lsblk</code>
+<code>df -h</code>
+</div>
+
+<h2>12. Backup skript</h2>
+<div class="step">
+Vytvoř adresář mimo LVM:
+<code>sudo mkdir /backup</code>
+<code>sudo chmod 777 /backup</code>
+
+Vytvoř skript:
+<code>nano /home/user/backup.sh</code>
+
+Vlož:
+<pre>#!/bin/bash
+tar -czf /backup/backup_$(date +%F).tar.gz /home/user/SHARE</pre>
+
+Nastav práva:
+<code>chmod +x /home/user/backup.sh</code>
+
+Spusť:
+<code>/home/user/backup.sh</code>
+
+Ověř zálohu:
+<code>ls -lh /backup</code>
+</div>
+
+<h2>13. Automatizace přes cron</h2>
+<div class="step">
+Otevři cron:
+<code>crontab -e</code>
+
+Denní záloha ve 2:00:
+<code>0 2 * * * /home/user/backup.sh</code>
+</div>
+
+<h2>14. KeePass</h2>
+<div class="step">
+Na Windows nainstaluj KeePass.
+
+Do databáze ulož:
+<ul>
+<li>Fedora SSH účet</li>
+<li>VNC heslo</li>
+<li>Samba přístup</li>
+<li>Cockpit přístup</li>
+</ul>
+</div>
+
+<h2>15. Test firewallu</h2>
+<div class="step">
+Z Windows otestuj povolený port:
+<code>Test-NetConnection 172.16.255.254 -Port 22</code>
+
+Otestuj zakázaný port:
+<code>Test-NetConnection 172.16.255.254 -Port 1234</code>
+
+Port 22 má projít, port 1234 má být blokovaný.
+</div>
+
+<h1>Template dokumentace k odevzdání</h1>
+
+<h2>1. Titulní strana</h2>
+<div class="step doc">
+<p><b>Název práce:</b> Návrh a konfigurace domácí síťové infrastruktury</p>
+<p><b>Jméno:</b> <span class="placeholder">DOPLŇ JMÉNO</span></p>
+<p><b>Třída:</b> <span class="placeholder">DOPLŇ TŘÍDU</span></p>
+<p><b>Datum:</b> <span class="placeholder">DOPLŇ DATUM</span></p>
+</div>
+
+<h2>2. Popis řešení</h2>
+<div class="step doc">
+<p>
+V této práci byla vytvořena modelová domácí síťová infrastruktura ve VMware Workstation.
+Windows 11 slouží jako správcovská stanice a Fedora Linux jako multimediální server.
+Komunikace probíhá přes NAT síť s adresním rozsahem 172.16.0.0/16.
+</p>
+</div>
+
+<h2>3. Síťová konfigurace</h2>
+<div class="step doc">
+<p><b>Typ sítě:</b> NAT</p>
+<p><b>Rozsah:</b> 172.16.0.0/16</p>
+<p><b>Gateway:</b> 172.16.0.1</p>
+<p><b>IP adresa serveru:</b> 172.16.255.254</p>
+<p><b>Screenshot:</b> vložit výpis <code>ip a</code> nebo nastavení VMware sítě.</p>
+</div>
+
+<h2>4. Disky a LVM</h2>
+<div class="step doc">
+<p>
+Server obsahuje systémový SATA disk a dva datové SATA disky. Datové disky byly spojeny pomocí LVM do jednoho logického svazku.
+</p>
+<p><b>Screenshot:</b> vložit výpis:</p>
+<code>lsblk</code>
+<code>df -h</code>
+</div>
+
+<h2>5. SSH přístup</h2>
+<div class="step doc">
+<p>
+Pro bezpečné připojení byl nastaven SSH přístup pomocí klíčů. Díky tomu není nutné při každém připojení zadávat heslo.
+</p>
+<p><b>Screenshot:</b> připojení z Windows přes:</p>
+<code>ssh user@172.16.255.254</code>
+</div>
+
+<h2>6. VNC vzdálená plocha</h2>
+<div class="step doc">
+<p>
+Na serveru bylo zprovozněno grafické prostředí KDE Plasma a vzdálená plocha přes VNC.
+</p>
+<p><b>Screenshot:</b> připojení z Windows VNC Viewerem.</p>
+</div>
+
+<h2>7. Firewall</h2>
+<div class="step doc">
+<p>
+Firewall firewalld byl nastaven tak, aby povoloval pouze nutné služby: SSH, VNC, HTTP 8080/8081, Cockpit a Samba.
+</p>
+<p><b>Screenshot:</b></p>
+<code>sudo firewall-cmd --list-all</code>
+<p><b>Test blokace portu:</b></p>
+<code>Test-NetConnection 172.16.255.254 -Port 1234</code>
+</div>
+
+<h2>8. Cockpit</h2>
+<div class="step doc">
+<p>
+Pro webovou správu serveru bylo nainstalováno rozhraní Cockpit.
+</p>
+<p><b>URL:</b></p>
+<code>https://172.16.255.254:9090</code>
+<p><b>Screenshot:</b> přihlášení do Cockpitu.</p>
+</div>
+
+<h2>9. Samba SHARE</h2>
+<div class="step doc">
+<p>
+Na serveru byl vytvořen sdílený adresář SHARE dostupný z Windows 11 přes SMB.
+</p>
+<p><b>Cesta ve Windows:</b></p>
+<code>\\172.16.255.254\SHARE</code>
+<p><b>Screenshot:</b> otevřený sdílený disk ve Windows.</p>
+</div>
+
+<h2>10. Webové servery</h2>
+<div class="step doc">
+<p>
+Na Fedoře byl nakonfigurován Apache se dvěma webovými instancemi na portech 8080 a 8081.
+</p>
+<p><b>URL:</b></p>
+<code>http://172.16.255.254:8080</code>
+<code>http://172.16.255.254:8081</code>
+<p><b>Screenshot:</b> obě stránky otevřené v prohlížeči.</p>
+</div>
+
+<h2>11. SCP / SFTP přenos</h2>
+<div class="step doc">
+<p>
+Ze systému Windows 11 byl přes SCP/SFTP nahrán soubor index.html na server a následně zkopírován do webového adresáře.
+</p>
+<p><b>Screenshot:</b> WinSCP nebo PowerShell se SCP příkazem.</p>
+</div>
+
+<h2>12. Zálohovací skript</h2>
+<div class="step doc">
+<p>
+Byl vytvořen Bash skript, který archivuje obsah adresáře SHARE a ukládá jej do složky /backup.
+Název archivu obsahuje aktuální datum.
+</p>
+<p><b>Screenshot:</b></p>
+<code>ls -lh /backup</code>
+</div>
+
+<h2>13. Závěr</h2>
+<div class="step doc">
+<p>
+V rámci práce byla úspěšně vytvořena domácí síťová infrastruktura. Windows 11 umožňuje vzdálenou správu Fedora serveru pomocí SSH, VNC, Cockpitu, Samby a webového rozhraní. Server má nakonfigurovaný firewall, LVM úložiště, webové služby a zálohovací skript.
+</p>
+</div>
+
+</body>
+</html>
