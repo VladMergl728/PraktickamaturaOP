@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Fedora Server z Windows 11 - Tahák</title>
+<style>
+body { font-family: Arial; background:#0f172a; color:#e2e8f0; padding:20px; }
+h1,h2 { color:#22c55e; }
+.step { margin-bottom:20px; padding:10px; border-left:4px solid #22c55e; }
+code { background:#1e293b; padding:5px; display:block; margin:5px 0; }
+</style>
+</head>
+<body>
+
+<h1>Fedora Linux Server - správa z Windows 11</h1>
+
+<h2>1. Síť + statická IP</h2>
+<div class="step">
+Zobrazení rozhraní:
+<code>ip a</code>
+
+Nastavení IP:
+<code>nmcli con show</code>
+
+Úprava:
+<code>sudo nmcli con mod "Wired connection 1" ipv4.addresses 172.16.0.254/16</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.gateway 172.16.0.1</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.dns 8.8.8.8</code>
+<code>sudo nmcli con mod "Wired connection 1" ipv4.method manual</code>
+
+Restart:
+<code>sudo nmcli con up "Wired connection 1"</code>
+</div>
+
+<h2>2. SSH (bez hesla)</h2>
+<div class="step">
+Na Windows:
+<code>ssh-keygen</code>
+
+Odeslání klíče:
+<code>ssh-copy-id user@172.16.0.254</code>
+
+Test:
+<code>ssh user@172.16.0.254</code>
+</div>
+
+<h2>3. KDE (GUI)</h2>
+<div class="step">
+<code>sudo dnf groupinstall "KDE Plasma Workspaces" -y</code>
+<code>sudo systemctl set-default graphical.target</code>
+</div>
+
+<h2>4. VNC server</h2>
+<div class="step">
+<code>sudo dnf install tigervnc-server -y</code>
+<code>vncserver</code>
+
+Na Windows použij VNC Viewer
+</div>
+
+<h2>5. Firewall (firewalld)</h2>
+<div class="step">
+Zapnutí:
+<code>sudo systemctl enable --now firewalld</code>
+
+Povolení portů:
+<code>sudo firewall-cmd --permanent --add-service=ssh</code>
+<code>sudo firewall-cmd --permanent --add-port=5901/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=8080/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=8081/tcp</code>
+<code>sudo firewall-cmd --permanent --add-port=9090/tcp</code>
+<code>sudo firewall-cmd --permanent --add-service=samba</code>
+
+Reload:
+<code>sudo firewall-cmd --reload</code>
+</div>
+
+<h2>6. Cockpit</h2>
+<div class="step">
+<code>sudo dnf install cockpit -y</code>
+<code>sudo systemctl enable --now cockpit</code>
+
+Web:
+http://172.16.0.254:9090
+</div>
+
+<h2>7. Samba (sdílení)</h2>
+<div class="step">
+<code>sudo dnf install samba -y</code>
+
+Edit:
+<code>sudo nano /etc/samba/smb.conf</code>
+
+Přidat:
+<code>
+[SHARE]<br>
+ path = /home/user/share<br>
+ browsable = yes<br>
+ writable = yes<br>
+ guest ok = yes
+</code>
+
+Spuštění:
+<code>sudo systemctl enable --now smb</code>
+</div>
+
+<h2>8. Web server (Apache)</h2>
+<div class="step">
+<code>sudo dnf install httpd -y</code>
+
+Spuštění:
+<code>sudo systemctl enable --now httpd</code>
+
+Porty:
+<code>sudo nano /etc/httpd/conf/httpd.conf</code>
+
+Přidat:
+<code>
+Listen 8080<br>
+Listen 8081
+</code>
+
+Restart:
+<code>sudo systemctl restart httpd</code>
+</div>
+
+<h2>9. SCP / SFTP test</h2>
+<div class="step">
+Na Windows:
+<code>scp index.html user@172.16.0.254:/var/www/html</code>
+</div>
+
+<h2>10. Backup script</h2>
+<div class="step">
+<code>nano backup.sh</code>
+
+Script:
+<code>
+#!/bin/bash<br>
+tar -czf /backup/backup_$(date +%F).tar.gz /home/user/share
+</code>
+
+Práva:
+<code>chmod +x backup.sh</code>
+
+Spuštění:
+<code>./backup.sh</code>
+</div>
+
+<h2>11. Cron (automatizace)</h2>
+<div class="step">
+<code>crontab -e</code>
+
+Denně:
+<code>0 2 * * * /home/user/backup.sh</code>
+</div>
+
+<h2>12. Ověření</h2>
+<div class="step">
+✔ SSH funguje<br>
+✔ VNC funguje<br>
+✔ Samba sdílení ve Windows<br>
+✔ Web: 8080 + 8081<br>
+✔ Cockpit běží<br>
+✔ Backup se vytváří
+</div>
+
+</body>
+</html>
